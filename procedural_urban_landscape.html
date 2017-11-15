@@ -1,0 +1,105 @@
+<!--Basic template for WebGL pixel shaders. Author: Przemyslaw Zaworski, 2017 -->
+<!doctype html>
+<html>
+	<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /></head> 
+	<body onload = loop()>
+		<canvas width = "800" height = "600" id = "shader"></canvas>
+		<p>Procedural urban landscape</p>
+		<style TYPE="text/css">
+			body {background: linear-gradient(to right,gray,white,gray);}
+			p {font-size:300%;text-align:center;}
+			canvas {padding:0;margin:auto;display:block;position:absolute;top:0;bottom:0;left:0;right:0;}
+		</style>
+		<script id="vertex_shader" type="text/glsl"> 
+			attribute vec2 position; 
+			void main(void) 
+			{ 
+				gl_Position = vec4(position,0.0,1.0);
+			}
+		</script>
+		<script id="pixel_shader" type="text/glsl"> 
+			precision lowp float;
+			uniform float iTime;
+			mat3 rotationX (float x) 
+			{
+				return mat3(1.0,0.0,0.0,0.0,cos(x),sin(x),0.0,-sin(x),cos(x));
+			}			
+			float hash (vec2 n) 
+			{ 
+				return fract(sin(dot(n, vec2(12.9898, 4.1414)))*43758.5453);
+			}
+			float map (vec3 p)
+			{
+				vec2 u = floor(p.xz*0.005*64.0)/64.0;
+				float h = hash(u);
+				h = p.y - 8.0 * h * h;
+				return max( min( h, 0.2), p.y-8.0 );
+			}			
+			vec4 color (vec3 ro)
+			{
+				float m = ro.y/8.0;
+				return vec4 (m,m,m,1.0);
+			}			
+			vec4 raymarch (vec3 ro, vec3 rd)
+			{
+				for (int i=0; i<256; i++)
+				{
+					float t = map(ro);
+					if ( t<0.001 ) return color(ro);
+					ro+=t*rd;
+				}
+				return vec4(0.0);
+			}
+			void main(void) 
+			{
+				vec2 resolution = vec2(800,600);
+				vec2 uv = (2.0*gl_FragCoord.xy-resolution.xy)/resolution.y;
+				vec3 ro = vec3(iTime*10.0,25,0);
+				vec3 rd = normalize(vec3(uv,2.0)*rotationX(5.65));
+				gl_FragColor = raymarch(ro,rd);
+			}
+		</script>	
+		<script>
+			var canvas = document.getElementById('shader');
+			var gl = canvas.getContext("webgl") || canvas.getContext('experimental-webgl');
+			if (!gl) alert("Error. Unable to initialize WebGL."); 
+			var vertices = [-1.0, -1.0, -1.0, 1.0,1.0, -1.0, 1.0, 1.0, -1.0, 1.0,1.0, -1.0];
+			var vertex_buffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+			var vertex_shader = gl.createShader(gl.VERTEX_SHADER);
+			gl.shaderSource(vertex_shader, document.getElementById("vertex_shader").text);
+			gl.compileShader(vertex_shader);
+			var pixel_shader = gl.createShader(gl.FRAGMENT_SHADER);
+			gl.shaderSource(pixel_shader, document.getElementById("pixel_shader").text);
+			gl.compileShader(pixel_shader);
+			var full_shader = gl.createProgram();
+			gl.attachShader(full_shader, vertex_shader); 
+			gl.attachShader(full_shader, pixel_shader);
+			gl.linkProgram(full_shader);
+			gl.useProgram(full_shader);
+			var coordinates = gl.getAttribLocation(full_shader, "position");
+			gl.vertexAttribPointer(coordinates, 2, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(coordinates);
+			window.requestAnimFrame = ( 
+			function() 
+			{ 
+				return  window.requestAnimationFrame || 
+				window.webkitRequestAnimationFrame ||  
+				window.mozRequestAnimationFrame || 
+				window.oRequestAnimationFrame || 
+				window.msRequestAnimationFrame ||
+				function(callback) {window.setTimeout(callback, 1000/60);};  
+			} ) (); 
+			var time = 0;  
+			function loop()
+			{
+				requestAnimFrame(loop);
+				time+=(1/60);
+				gl.uniform1f(gl.getUniformLocation(full_shader,"iTime"), time);
+				gl.clear(gl.COLOR_BUFFER_BIT);
+				gl.drawArrays(gl.TRIANGLES, 0, 6);
+			}	 
+		</script>     
+	</body>
+</html>
