@@ -1,0 +1,140 @@
+<!--Author: Przemyslaw Zaworski, 2017 -->
+<!doctype html>
+<html>
+	<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /></head> 
+	<body onload = loop()>
+		<canvas width = "800" height = "600" id = "shader"></canvas>
+		<p>Tetrahedron Demo</p>
+		<div id="field"><div id="description">Set object size</div></br>
+			<input type="range" id="slider" min="0.0" max="20.0" value="10.0" onchange="scale(this.value);" oninput="scale(this.value)">
+		</div>
+		<style TYPE="text/css">
+			body {background: linear-gradient(to right,black,gray,black);}
+			p {font-size:300%;text-align:center;}
+			canvas {padding:0;margin:auto;display:block;position:absolute;top:0;bottom:0;left:0;right:0;}
+			#field {border:3px solid black;font-size:200%;position:fixed;top:40px;left:250px;}
+			#slider{position:absolute;margin:auto;top:30px;bottom:0px;left:30px;right:0;}
+		</style>
+		<script id="vertex_shader" type="text/glsl"> 
+			attribute vec2 position; 
+			void main(void) 
+			{ 
+				gl_Position = vec4(position,0.0,1.0);
+			}
+		</script>
+		<script id="pixel_shader" type="text/glsl"> 
+			precision lowp float;
+			uniform float iTime;
+			uniform float size;
+			mat3 rotationX( float x) 
+			{
+				return mat3
+				(
+					1.0,0.0,0.0,
+					0.0,cos(x),sin(x),
+					0.0,-sin(x),cos(x)
+				);
+			}
+			mat3 rotationY( float y) 
+			{
+				return mat3
+				(
+					cos(y),0.0,-sin(y),
+					0.0,1.0,0.0,
+					sin(y),0.0,cos(y)
+				);
+			}
+			float  plane(vec3 p, vec3 c, vec3 n)
+			{ 
+			   return dot(p-c,n);   
+			}
+			float tetrahedron(vec3 p, float e) 
+			{
+				float f = 0.57735;
+				float a = plane(p,vec3(e,e,e),vec3(-f,f,f)); 
+				float b = plane(p,vec3(e,-e,-e),vec3(f,-f,f));
+				float c = plane(p,vec3(-e,e,-e),vec3(f,f,-f));
+				float d = plane(p,vec3(-e,-e,e),vec3(-f,-f,-f));
+				return max(max(a,b),max(c,d));
+			}
+			float map (vec3 p)
+			{
+				p=rotationY(iTime)*rotationX(iTime)*p;
+				return tetrahedron(p,size);
+			}		
+			vec4 lighting (vec3 p, float e)
+			{
+				vec4 a = vec4 (0.1,0.1,0.1,1.0);   
+				vec4 lc = vec4(1.0,1.0,0.0,1.0);       
+				vec3 ld = normalize(vec3(6,15,-7));   
+				float c = (map(p+ld*e)-map(p))/e;       
+				return max(c,0.0)*lc+a;               
+			}		
+			vec4 raymarch (vec3 ro, vec3 rd)
+			{
+				for (int i=0; i<128; i++)
+				{
+					float t = map(ro);
+					if ( t<0.001 ) return lighting(ro,0.01);
+					ro+=t*rd;
+				}
+				return vec4(0.0);
+			}
+			void main(void) 
+			{
+				vec2 resolution = vec2(800,600);
+				vec2 uv = (2.0*gl_FragCoord.xy-resolution.xy)/resolution.y;
+				vec3 ro = vec3(0.0,0.0,-8.0);
+				vec3 rd = normalize(vec3(uv,2.0));
+				gl_FragColor = raymarch(ro,rd);
+			}
+		</script>	
+		<script>
+			var canvas = document.getElementById('shader');
+			var gl = canvas.getContext("webgl") || canvas.getContext('experimental-webgl');
+			if (!gl) alert("Error. Unable to initialize WebGL."); 
+			var vertices = [-1.0, -1.0, -1.0, 1.0,1.0, -1.0, 1.0, 1.0, -1.0, 1.0,1.0, -1.0];
+			var vertex_buffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+			var vertex_shader = gl.createShader(gl.VERTEX_SHADER);
+			gl.shaderSource(vertex_shader, document.getElementById("vertex_shader").text);
+			gl.compileShader(vertex_shader);
+			var pixel_shader = gl.createShader(gl.FRAGMENT_SHADER);
+			gl.shaderSource(pixel_shader, document.getElementById("pixel_shader").text);
+			gl.compileShader(pixel_shader);
+			var full_shader = gl.createProgram();
+			gl.attachShader(full_shader, vertex_shader); 
+			gl.attachShader(full_shader, pixel_shader);
+			gl.linkProgram(full_shader);
+			gl.useProgram(full_shader);
+			var coordinates = gl.getAttribLocation(full_shader, "position");
+			gl.vertexAttribPointer(coordinates, 2, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(coordinates);
+			function scale(x)
+			{
+				gl.uniform1f(gl.getUniformLocation(full_shader,"size"),x*0.1);
+			}
+			scale(10.0);
+			window.requestAnimFrame = ( 
+			function() 
+			{ 
+				return  window.requestAnimationFrame || 
+				window.webkitRequestAnimationFrame ||  
+				window.mozRequestAnimationFrame || 
+				window.oRequestAnimationFrame || 
+				window.msRequestAnimationFrame ||
+				function(callback) {window.setTimeout(callback, 1000/60);};  
+			} ) (); 
+			var time = 0;  
+			function loop()
+			{
+				requestAnimFrame(loop);
+				time+=(1/60);
+				gl.uniform1f(gl.getUniformLocation(full_shader,"iTime"), time);
+				gl.clear(gl.COLOR_BUFFER_BIT);
+				gl.drawArrays(gl.TRIANGLES, 0, 6);
+			}	 
+		</script>     
+	</body>
+</html>
