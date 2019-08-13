@@ -1,0 +1,69 @@
+<html>
+	<head><meta charset="utf-8"></head>
+	<body onload = loop()>
+		<canvas width = "800" height = "600" id = "shader"></canvas>
+		<script id="VertexShader" type="x-shader/x-vertex">
+			#version 300 es 
+			out vec3 normal;
+			void main()
+			{
+				float f = float(gl_VertexID);
+				float v = f - 6.0 * floor(f/6.0);
+				f = (f - v) / 6.;
+				float a = f - 256.0 * floor(f/256.0);
+				f = (f-a) / 256.;
+				float b = f-64.;
+				a += (v - 2.0 * floor(v/2.0));
+				b += v==2. || v>=4. ? 1.0 : 0.0;
+				a = a/256.*6.28318;
+				b = b/256.*6.28318;
+				vec3 p = vec3(cos(a)*cos(b), sin(b), sin(a)*cos(b));
+				normal = normalize(p);
+				gl_Position = vec4(p, 2);
+			}
+		</script>
+		<script id="PixelShader" type="x-shader/x-fragment">
+			#version 300 es
+			precision highp float;
+			uniform float iTime;
+			in vec3 normal;
+			out vec4 fragColor;
+			void main()
+			{
+				vec3 diffuse = vec3(max(dot(normalize(vec3(sin(iTime)*10.0,0,-10)).xyz, normal),0.1));
+				fragColor = vec4(diffuse,1.0);
+			}
+		</script>
+		<script>
+			var canvas = document.getElementById('shader');
+			var gl = canvas.getContext( 'webgl2', { antialias: false } );
+			var vertexshader = gl.createShader(gl.VERTEX_SHADER);
+			gl.shaderSource(vertexshader, document.getElementById("VertexShader").textContent.replace(/^\s+|\s+$/g, ''));
+			gl.compileShader(vertexshader);
+			var pixelshader = gl.createShader(gl.FRAGMENT_SHADER);
+			gl.shaderSource(pixelshader, document.getElementById("PixelShader").textContent.replace(/^\s+|\s+$/g, ''));
+			gl.compileShader(pixelshader);
+			var program = gl.createProgram();
+			gl.attachShader(program, vertexshader);
+			gl.attachShader(program, pixelshader);
+			gl.linkProgram(program);
+			gl.useProgram(program);
+			window.requestAnimFrame = ( 
+			function() 
+			{ 
+				return  window.requestAnimationFrame || 
+				function(callback) {window.setTimeout(callback, 1000/60);};  
+			} ) (); 
+			var time = 0;  
+			function loop()
+			{
+				requestAnimFrame(loop);
+				time+=(1/60);
+				gl.uniform1f(gl.getUniformLocation(program,"iTime"), time);
+				gl.clearColor(0, 0, 0, 1);
+				gl.clear(gl.COLOR_BUFFER_BIT );
+				gl.drawArrays(gl.TRIANGLES, 0, 196608);
+			}
+		</script>
+	</body>
+</html>

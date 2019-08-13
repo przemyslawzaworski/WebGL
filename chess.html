@@ -1,0 +1,55 @@
+<html>
+	<head><meta charset="utf-8"></head>
+	<body onload = loop()>
+		<canvas width = "800" height = "600" id = "shader"></canvas>
+		<script id="VertexShader" type="x-shader/x-vertex">
+			#version 300 es  
+			void main()
+			{
+				float x = float((gl_VertexID & 1) << 2);
+				float y = float((gl_VertexID & 2) << 1);
+				gl_Position = vec4(x - 1.0, y - 1.0, 0, 1);
+			}
+		</script>
+		<script id="PixelShader" type="x-shader/x-fragment">
+			#version 300 es
+			precision highp float;
+			uniform float iTime;
+			out vec4 fragColor;
+			void main()
+			{
+				vec2 p = ceil(gl_FragCoord.xy/30.0 + sin(iTime));
+				fragColor = vec4(mod(p.xxx + p.y, 2.0), 1.0);
+			}
+		</script>
+		<script>
+			var canvas = document.getElementById('shader');
+			var gl = canvas.getContext( 'webgl2', { antialias: false } );
+			var vertexshader = gl.createShader(gl.VERTEX_SHADER);
+			gl.shaderSource(vertexshader, document.getElementById("VertexShader").textContent.replace(/^\s+|\s+$/g, ''));
+			gl.compileShader(vertexshader);		
+			var pixelshader = gl.createShader(gl.FRAGMENT_SHADER);
+			gl.shaderSource(pixelshader, document.getElementById("PixelShader").textContent.replace(/^\s+|\s+$/g, ''));
+			gl.compileShader(pixelshader);
+			var program = gl.createProgram();
+			gl.attachShader(program, vertexshader);
+			gl.attachShader(program, pixelshader);
+			gl.linkProgram(program);
+			gl.useProgram(program);
+			window.requestAnimFrame = ( 
+			function() 
+			{ 
+				return  window.requestAnimationFrame || 
+				function(callback) {window.setTimeout(callback, 1000/60);};  
+			} ) (); 
+			var time = 0;  
+			function loop()
+			{
+				requestAnimFrame(loop);
+				time+=(1/60);
+				gl.uniform1f(gl.getUniformLocation(program,"iTime"), time);
+				gl.drawArrays(gl.TRIANGLES, 0, 6);
+			}
+		</script>
+	</body>
+</html>
